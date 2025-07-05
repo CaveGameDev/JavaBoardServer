@@ -1,37 +1,31 @@
-const fs = require('fs');
-const WebSocket = require('ws');
+const express = require('express');
 const http = require('http');
+const WebSocket = require('ws');
 const path = require('path');
 
-const PORT = 8080;
-
-const server = http.createServer((req, res) => {
-  if (req.url === '/') {
-    const html = fs.readFileSync('index.html');
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(html);
-  }
-});
-
+const app = express();
+const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-let clients = [];
 
+const PORT = process.env.PORT || 8080;
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+let clients = [];
 let mergedNotes = [];
 
 function mergeNotes(newNotes) {
   const byId = Object.fromEntries(mergedNotes.map(n => [n.id, n]));
   for (const note of newNotes) {
-    byId[note.id] = note; // replace or add
+    byId[note.id] = note;
   }
   mergedNotes = Object.values(byId);
 }
 
 wss.on('connection', (ws) => {
   clients.push(ws);
-
   console.log(`Client connected (${clients.length} total)`);
 
-  // Send current notes
   ws.send(JSON.stringify({ type: 'sync', data: mergedNotes }));
 
   ws.on('message', (msg) => {
@@ -40,7 +34,6 @@ wss.on('connection', (ws) => {
       if (parsed.type === 'upload') {
         mergeNotes(parsed.data);
 
-        // Broadcast sync and upload-log to all clients
         const syncMsg = JSON.stringify({ type: 'sync', data: mergedNotes });
         const logMsg = JSON.stringify({ type: 'upload-log', data: parsed.data });
 
@@ -65,5 +58,5 @@ wss.on('connection', (ws) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server listening on port ${PORT}`);
 });
