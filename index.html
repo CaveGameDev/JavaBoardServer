@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Corkboard Sync Server</title>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: monospace; background: #111; color: #0f0; padding: 1em; }
+    #log { white-space: pre-wrap; background: #000; padding: 1em; height: 80vh; overflow-y: scroll; border: 1px solid #0f0; }
+  </style>
+</head>
+<body>
+  <h2>Corkboard Sync Server Status</h2>
+  <div id="log"></div>
+  <script>
+    const log = document.getElementById('log');
+
+    const ws = new WebSocket(`ws://${location.hostname}:8080`);
+
+    function addLog(message) {
+      const time = new Date().toLocaleTimeString();
+      log.innerText += `[${time}] ${message}\n`;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    ws.onopen = () => {
+      addLog('Connected to server...');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'sync') {
+          addLog(`Received ${msg.data.length} note(s) from server.`);
+          msg.data.forEach(note => {
+            addLog(`  [RECV] ${note.id}: "${note.text.substring(0, 30).replace(/\n/g, ' ')}..."`);
+          });
+        } else {
+          addLog(`Unknown message type: ${msg.type}`);
+        }
+      } catch (e) {
+        addLog(`Error parsing message: ${event.data}`);
+      }
+    };
+
+    ws.onclose = () => {
+      addLog('Disconnected from server.');
+    };
+
+    ws.onerror = (err) => {
+      addLog('WebSocket error.');
+    };
+  </script>
+</body>
+</html>
